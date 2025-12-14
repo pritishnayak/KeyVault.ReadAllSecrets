@@ -7,7 +7,8 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.AddServiceDefaults();
 
 builder.Services.AddHostedService<SecretGenerator>();
-builder.Services.AddHostedService<SecretNameWorker>();
+//builder.Services.AddHostedService<SecretNameWorker>();
+builder.Services.AddHostedService<SecretNameUsingRESTWorker>();
 for (int i = 1; i <= 3; i++)
 {
     builder.Services.AddKeyedHostedService<SecretValueWorker>(i);
@@ -24,7 +25,7 @@ var vaultUri = builder.Configuration.GetConnectionString("keyvault") ?? string.E
 
 // Basic Secrets only implementation
 builder.Services.AddAzureKeyVaultEmulator(vaultUri);
-
+builder.Services.AddSingleton(new EmulatedTokenCredential(vaultUri));
 
 builder.Services.AddSingleton(Channel.CreateBounded<string>(new BoundedChannelOptions(100)
 {

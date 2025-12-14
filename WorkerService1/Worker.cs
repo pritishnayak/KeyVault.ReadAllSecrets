@@ -1,4 +1,7 @@
+using Azure.Core;
 using Azure.Security.KeyVault.Secrets;
+using AzureKeyVaultEmulator.Aspire.Client;
+using System.Net.Http.Json;
 using System.Threading.Channels;
 
 namespace WorkerService1;
@@ -74,6 +77,63 @@ public class SecretNameWorker : IHostedService
     }
 }
 
+public class SecretNameUsingRESTWorker : IHostedService
+{
+    private readonly HttpClient _client;
+    private readonly Channel<string> _channel;
+    private readonly EmulatedTokenCredential _credential;
+    private readonly IConfiguration _configuration;
+    private readonly ILogger<SecretNameUsingRESTWorker> _logger;
+
+    public SecretNameUsingRESTWorker(HttpClient client,
+                             Channel<string> channel,
+                             EmulatedTokenCredential credential,
+                             IConfiguration configuration,
+                             ILogger<SecretNameUsingRESTWorker> logger)
+    {
+        _client = client;
+        _channel = channel;
+        _credential = credential;
+        _configuration = configuration;
+        _logger = logger;
+    }
+
+    public async Task StartAsync(CancellationToken cancellationToken)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+        _logger.LogInformation("SecretNameWorker Started at: {time}", DateTimeOffset.Now);
+
+        string? nextLink = $"{_configuration.GetConnectionString("keyvault")}/secrets?api-version=2025-07-01&maxresults=25";
+
+        while (!string.IsNullOrEmpty(nextLink))
+        {
+            await Task.Delay(Random.Shared.Next(100, 2000), cancellationToken);
+            var token = await _credential.GetTokenAsync(new TokenRequestContext(["https://vault.azure.net/.default"]), cancellationToken);
+            _client.DefaultRequestHeaders.Authorization = new(token.TokenType, token.Token);
+            var secretNamesResponse = await _client.GetFromJsonAsync<KeyVaultSecretsResponse>(nextLink, cancellationToken);
+
+            foreach (var item in secretNamesResponse.Value)
+            {
+                await _channel.Writer.WriteAsync(item.Name, cancellationToken);
+            }
+
+            nextLink = secretNamesResponse?.NextLink;
+
+        }
+
+        _channel.Writer.Complete();
+
+        _logger.LogInformation("SecretNameWorker Completed at: {time}", DateTimeOffset.Now);
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("SecretNameWorker Stopping at: {time}", DateTimeOffset.Now);
+
+        return Task.CompletedTask;
+    }
+}
+
 public class SecretValueWorker : IHostedService
 {
     private readonly SecretClient _secretClient;
@@ -117,4 +177,17 @@ public class SecretValueWorker : IHostedService
 
         return Task.CompletedTask;
     }
+}
+
+
+public class KeyVaultSecretsResponse
+{
+    public Value[] Value { get; set; }
+    public string NextLink { get; set; }
+}
+
+public class Value
+{
+    public string Id { get; set; }
+    public string Name => Id.Split("/")[4];
 }

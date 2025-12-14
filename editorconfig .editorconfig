@@ -1,0 +1,24 @@
+root = true
+
+[*.cs]
+indent_style = space
+indent_size = 4
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+
+# C# coding conventions
+# Keep fields unqualified by default
+dotnet_style_qualification_for_field = false:suggestion
+
+# Naming rule: readonly fields must start with an underscore and use camelCase
+dotnet_naming_rule.readonly_fields_underscore.severity = warning
+dotnet_naming_rule.readonly_fields_underscore.symbols = readonly_fields
+dotnet_naming_rule.readonly_fields_underscore.style = underscore_prefix_style
+
+dotnet_naming_symbols.readonly_fields.applicable_kinds = field
+dotnet_naming_symbols.readonly_fields.required_modifiers = readonly
+dotnet_naming_symbols.readonly_fields.applicable_accessibilities = *
+
+dotnet_naming_style.underscore_prefix_style.required_prefix = _
+dotnet_naming_style.underscore_prefix_style.capitalization = camel_case
